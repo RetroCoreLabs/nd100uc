@@ -5,11 +5,11 @@ ND-100, ND-110, and ND-120 minicomputers. Web-based disassembler/viewer,
 ROM combiners, and build pipeline.
 
 The TypeScript library and YAML definitions live in the shared
-[nd-microcode-meta](https://github.com/HackerCorpLabs/nd-microcode-meta)
+[nd-microcode-meta](https://github.com/RetroCoreLabs/nd-microcode-meta)
 submodule. The VSCode extension lives in a
-[separate repo](https://github.com/HackerCorpLabs/vs-extension-nd110-uc).
+[separate repo](https://github.com/RetroCoreLabs/vs-extension-nd110-uc).
 
-**Live web viewer:** [hackercorplabs.github.io/nd100uc](https://hackercorplabs.github.io/nd100uc/)
+**Live web viewer:** [retrocorelabs.github.io/nd100uc](https://retrocorelabs.github.io/nd100uc/)
 
 ## Status
 
@@ -23,13 +23,13 @@ submodule. The VSCode extension lives in a
 | ND-110/120 ROM combiner + CLI   | done        | 2-chip EPROM interleave with auto-detect (TypeScript)            |
 | Web disassembler                 | done        | 3-line layout, opcode badges, clickable labels, all models       |
 | GitHub Pages auto-deploy         | done        | Pushes to main auto-deploy the web viewer                       |
-| VSCode extension                 | done        | [vs-extension-nd110-uc](https://github.com/HackerCorpLabs/vs-extension-nd110-uc) |
+| VSCode extension                 | done        | [vs-extension-nd110-uc](https://github.com/RetroCoreLabs/vs-extension-nd110-uc) |
 
 ## Repository layout
 
 | Path                                          | Description                                                  |
 |-----------------------------------------------|--------------------------------------------------------------|
-| `external/meta/`                              | Submodule: [nd-microcode-meta](https://github.com/HackerCorpLabs/nd-microcode-meta) |
+| `external/meta/`                              | Submodule: [nd-microcode-meta](https://github.com/RetroCoreLabs/nd-microcode-meta) |
 | `external/meta/defs/`                         | YAML token/field definitions (source of truth)               |
 | `external/meta/lib/ts/`                       | TypeScript library (`@nd100uc/microcode`)                    |
 | `external/meta/reference/roms/`               | PROM/EPROM dumps for all three models                        |
@@ -60,7 +60,7 @@ All three models use 64-bit microinstruction words.
 ## Building the web app
 
 ```bash
-git clone --recurse-submodules https://github.com/HackerCorpLabs/nd100uc.git
+git clone --recurse-submodules https://github.com/RetroCoreLabs/nd100uc.git
 cd nd100uc
 
 # Build the TS library (in the submodule)
@@ -110,8 +110,8 @@ The web app is also auto-deployed to GitHub Pages on every push to main.
 
 | Repo | Description |
 |------|-------------|
-| [nd-microcode-meta](https://github.com/HackerCorpLabs/nd-microcode-meta) | Shared submodule: YAML definitions, TS library, reference ROMs |
-| [vs-extension-nd110-uc](https://github.com/HackerCorpLabs/vs-extension-nd110-uc) | VSCode extension for .uc files |
+| [nd-microcode-meta](https://github.com/RetroCoreLabs/nd-microcode-meta) | Shared submodule: YAML definitions, TS library, reference ROMs |
+| [vs-extension-nd110-uc](https://github.com/RetroCoreLabs/vs-extension-nd110-uc) | VSCode extension for .uc files |
 
 ## License
 
