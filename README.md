@@ -45,11 +45,20 @@ submodule. The VSCode extension lives in a
 
 | Model  | Word size | Chips                         | XOR on load                                       |
 |--------|-----------|-------------------------------|---------------------------------------------------|
-| ND-100 | 64-bit    | 16 x 82S185 PROMs per bank   | `0x0F800000` (bits 23-27)                         |
-| ND-110 | 64-bit    | 2 x 27256 EPROMs              | `0x0FC00000` (bits 22-27)                         |
+| ND-100 | 64-bit    | 16 x 82S185 PROMs per bank   | `0x0FC00000` (bits 22-27, ND-06.018.01)           |
+| ND-110 | 64-bit    | 2 x 27256 EPROMs              | `0x0FC00000` (bits 22-27, ND-06.031.1)            |
 | ND-120 | 64-bit    | 2 x 27C256 EPROMs             | None (canonical form)                             |
 
 All three models use 64-bit microinstruction words.
+
+The ND-100 and ND-110 store bits 22-27 of the word inverted; the loader flips
+them back so the token tables (active high) match. The ND-120 images are
+already in that form. Manual text: ND-06.018.01 EN "NORD-100 Microprogramming
+Description" (Writing the Microprogram: "bits 22 - 27 are inverted after the
+word is assembled") and ND-06.031.1 EN "ND-110 and ND-120 Microprogrammer's
+Guide" (chapter 4: "for ND-110 only, bits 22-27 ... are inverted after the
+word is assembled"). Details and the chip evidence are in
+`external/meta/reference/roms/ND100/README.md`.
 
 ### Hardware
 

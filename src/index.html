@@ -1304,15 +1304,20 @@ async function loadMicrocodeData(path) {
             mc |= BigInt(bytes[i + 2 + j]) << BigInt(j * 8);
         }
 
-        // ND-110: invert condition control bits 22-27 (token form -> canonical)
+        // ND-110: bits 22-27 are stored inverted (ROM/token form -> canonical).
+        // ND-06.031.1 chapter 4: "for ND-110 only, bits 22-27 of the
+        // microinstruction word are inverted after the word is assembled."
         if (nd110Mode) {
             mc = mc ^ 0x000000000FC00000n;
         }
-        // ND-100: invert bits 23-24 only (SCOND + CONDENABL polarity).
-        // Bits 25-27 (VECT0/SLWCS0/MAPJ0) are genuinely active-low
-        // hardware signals — NOT an inversion convention.
+        // ND-100: bits 22-27 are stored inverted in the PROMs too, same mask.
+        // ND-06.018.01 "Writing the Microprogram": "bits 22 - 27 are inverted
+        // after the word is assembled"; the word description calls each of
+        // the bits 22 to 27 active low. (This line used 0x0F800000 and the
+        // comment "23-24 only" before; neither agrees with the manual.)
+        // ND-120 images are canonical: no flip.
         if (isND100) {
-            mc = mc ^ 0x000000000F800000n;
+            mc = mc ^ 0x000000000FC00000n;
         }
 
         microcodeData[addr] = mc;

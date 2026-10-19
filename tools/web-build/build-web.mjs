@@ -198,16 +198,20 @@ function nd100Entry(variant, outPrefix, name, role) {
     // aware MIS at 42-43). The decode PLA is a separate ROM that maps
     // macro-opcodes to microaddress entry points - not a microinstruction.
     model: isMicro ? "nd100" : "nd100",
-    // ND-100 3033S/3033E-CX factory PROMs store bits in canonical form
-    // (no 22-27 inversion). This was verified empirically: address 0
-    // decodes as T,JMPAOPR T,HOLD 4261 (vectored reset dispatch) without
-    // XOR applied - matches expected hardware reset-vector semantics.
-    // Compare: ND-110 C# compiler output DOES invert bits 22-27 (see
-    // ND110Compile/Compiler.cs line 372).
-    storageForm: "canonical",
+    // ND-100 3033S/3033E-CX factory PROMs store bits 22-27 INVERTED, the
+    // same mask (0x0FC00000) as the ND-110. ND-06.018.01 "NORD-100
+    // Microprogramming Description", Writing the Microprogram: "bits 22 - 27
+    // are inverted after the word is assembled"; bits 22 to 27 are active
+    // low. The CODE file written here is in PROM form (the chip words are not
+    // changed); the web page flips it on load for model "ND-100"
+    // (src/index.html). storageForm "prom" is not "token", so isND110 stays
+    // false and the ND-110 flip is not applied a second time.
+    // Compare: the ND-110 C# compiler also inverts bits 22-27 (ND-06.031.1
+    // chapter 4, ND110Compile/Compiler.cs).
+    storageForm: "prom",
     codeFile: `MC/${outPrefix}-${role}.CODE`,
     notes: isMicro
-      ? `Combined 64-bit microword from 16 82S185 PROMs. PCB column inverse to bit position: d20 = bits 0-3 (low nibble), d5 = bits 60-63 (high nibble). Verified 100% bit-exact against Frode's independently-stitched reference images. Stored canonical; no XOR needed on load.`
+      ? `Combined 64-bit microword from 16 82S185 PROMs. PCB column inverse to bit position: d20 = bits 0-3 (low nibble), d5 = bits 60-63 (high nibble). Verified 100% bit-exact against Frode's independently-stitched reference images. Stored in PROM form: bits 22-27 are inverted (XOR 0x0FC00000 on load, ND-06.018.01).`
       : `Combined from 3 82S185 PROMs (b18-b20). 12-bit macro-opcode dispatch PLA: b20 = low nibble, b18 = high nibble. Not a microinstruction; cannot be disassembled as microcode.`,
   };
   if (!isMicro) base.notMicroinstruction = true;
@@ -269,6 +273,8 @@ for (const e of manifestEntries) {
 // expects: { path (without .CODE extension), name, model, hasLabels, isND110 }.
 // - storageForm: "token"     -> isND110: true  (needs XOR flip on load)
 // - storageForm: "canonical" -> isND110: false (already canonical form)
+// - storageForm: "prom"      -> isND110: false (ND-100: bits 22-27 inverted,
+//                               flipped on load for model "ND-100" in index.html)
 // Entries excluded:
 //   - DELILAH stub (produces garbage)
 //   - notMicroinstruction (ND-100 sequencer / decode PLA)
