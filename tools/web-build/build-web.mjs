@@ -318,6 +318,22 @@ console.log("\nAdding the labelled ND-100 sources...");
   }
 }
 
+// ND-120 DELILAH-L source: assembled, it gives the same micro words as the
+// 3202D factory ROM (4MB configuration) at the same addresses (checked word for
+// word: 4886 of 4886). The ROM holds 3306 more non-zero words that the source
+// does not have.
+{
+  const SRC120 = resolve(REPO, "microcode", "ND-120");
+  const e = manifestEntries.find((x) => x.id === "nd120-3202D-4MB");
+  if (e && existsSync(resolve(SRC120, "ND-120-DELILAH-L.uc"))) {
+    copyFileSync(resolve(SRC120, "ND-120-DELILAH-L.uc"), resolve(MC, "ND-120-DELILAH-L.uc"));
+    copyFileSync(resolve(SRC120, "ND-120-DELILAH-L.SYMBOLS.TXT"), resolve(MC, "ND-120-3202D-4MB.SYMBOLS.TXT"));
+    e.sourceFile = "MC/ND-120-DELILAH-L.uc";
+    e.symbolsFile = "MC/ND-120-3202D-4MB.SYMBOLS.TXT";
+    e.notes += " Source and labels: DELILAH-L .uc, which assembles to 4886 of this ROM's words exactly (the ROM has 3306 more non-zero words that are not in the source).";
+  }
+}
+
 // --------------------------------------------------------------------
 // 4. Write manifest
 // --------------------------------------------------------------------

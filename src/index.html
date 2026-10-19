@@ -488,6 +488,26 @@
         }
         .view-toggle button:not(:last-child) { border-right: 1px solid var(--border); }
 
+        /* Source tab: the full commented .uc text */
+        .source-content {
+            display: none;
+            flex: 1;
+            overflow: auto;
+            padding: 6px 0;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.45;
+            background: var(--bg-card);
+        }
+        .source-content.visible { display: block; }
+        .src-line { display: flex; white-space: pre; padding-right: 20px; }
+        .src-line.hl { background: var(--active-bg); }
+        .src-ln { flex: 0 0 60px; text-align: right; padding-right: 12px; color: var(--text-muted); user-select: none; }
+        .src-cmt { color: var(--text-secondary); font-style: italic; }
+        .src-label { font-weight: 700; color: var(--primary-dark); }
+        .src-ref { cursor: pointer; text-decoration: underline dotted; }
+        .listing-label.has-src { cursor: pointer; text-decoration: underline dotted; }
+
         /* Opcode mapping indicator */
         .listing-opcode {
             color: #16a085;
@@ -561,6 +581,10 @@
                     <button id="viewAsm" class="active" title="Mnemonic view">ASM</button>
                     <button id="viewPseudo" title="Pseudo-code view">Pseudo</button>
                 </div>
+                <div class="view-toggle" id="srcToggle" style="display:none">
+                    <button id="tabDis" class="active" title="Decoded micro words">Disassembly</button>
+                    <button id="tabSrc" title="Full commented micro code source (.uc)">Source</button>
+                </div>
                 <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px">
                     <input type="checkbox" id="hideEmpty"> Hide empty
                 </label>
@@ -572,6 +596,7 @@
                 </label>
             </div>
             <div class="listing-content" id="listingContent"></div>
+            <div class="source-content" id="sourceContent"></div>
             <div class="listing-footer">
                 <span id="statusText">Loading...</span>
                 <div class="page-controls">
@@ -1491,7 +1516,8 @@ function renderListing() {
         if (item.label) {
             const meta = labelMeta[item.addr];
             const tip = meta ? ` title="${escHtml(meta)}"` : '';
-            labelHtml = `<span class="listing-label"${tip}>${escHtml(item.label)}:</span>`;
+            const srcAttr = srcAvail ? ` onclick="event.stopPropagation(); showSourceLabel('${escHtml(item.label)}')"` : '';
+            labelHtml = `<span class="listing-label${srcAvail ? ' has-src' : ''}"${tip}${srcAttr}>${escHtml(item.label)}:</span>`;
         }
 
         // Opcode badge for addresses that are macroinstruction entry points
@@ -1753,6 +1779,7 @@ function jumpToAddr(addr) {
 }
 
 function searchLabel(query) {
+    if (viewTab === 'src' && srcAvail) { searchSource(query); return; }
     query = query.trim().toUpperCase();
     if (!query) return;
 
@@ -1768,6 +1795,125 @@ function searchLabel(query) {
             jumpToAddr(addr);
             return;
         }
+    }
+}
+
+/* =========================================================================
+   SOURCE TAB: the full commented .uc text of the selected file
+   ========================================================================= */
+let viewTab = 'dis';      // 'dis' = decoded words, 'src' = source text
+let srcAvail = false;     // the selected file has a .uc source in the manifest
+let srcUrl = '';          // address of that source
+let srcLoaded = '';       // address of the text now shown in #sourceContent
+let srcLabelLine = {};    // label -> line number (1 based) of its definition
+
+function renderSourceText(text) {
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    const defRe = /^\s*([A-Z0-9_]+):/;
+
+    // First pass: where every label is defined
+    srcLabelLine = {};
+    lines.forEach((ln, i) => {
+        const p = ln.indexOf('%');
+        const m = defRe.exec(p < 0 ? ln : ln.slice(0, p));
+        if (m && srcLabelLine[m[1]] === undefined) srcLabelLine[m[1]] = i + 1;
+    });
+
+    // Second pass: one row per line; label definitions in bold, jump operands
+    // that name a label are links to its definition, comments in italics.
+    const tokRe = /[A-Z0-9_]+/g;
+    const out = [];
+    lines.forEach((ln, i) => {
+        const p = ln.indexOf('%');
+        const code = p < 0 ? ln : ln.slice(0, p);
+        const cmt = p < 0 ? '' : ln.slice(p);
+        const dm = defRe.exec(code);
+        const defStart = dm ? code.indexOf(dm[1]) : -1;
+        let html = '';
+        let pos = 0;
+        let m;
+        tokRe.lastIndex = 0;
+        while ((m = tokRe.exec(code)) !== null) {
+            const w = m[0];
+            const end = m.index + w.length;
+            const prev = m.index > 0 ? code[m.index - 1] : ' ';
+            const next = end < code.length ? code[end] : ' ';
+            html += escHtml(code.slice(pos, m.index));
+            if (m.index === defStart && next === ':') {
+                html += `<span class="src-label">${escHtml(w)}</span>`;
+            } else if (srcLabelLine[w] !== undefined && /\s/.test(prev) && next !== ',' && next !== '.') {
+                html += `<span class="src-ref" data-label="${escHtml(w)}">${escHtml(w)}</span>`;
+            } else {
+                html += escHtml(w);
+            }
+            pos = end;
+        }
+        html += escHtml(code.slice(pos));
+        if (cmt) html += `<span class="src-cmt">${escHtml(cmt)}</span>`;
+        out.push(`<div class="src-line" id="srcl-${i + 1}"><span class="src-ln">${i + 1}</span><span>${html}</span></div>`);
+    });
+    document.getElementById('sourceContent').innerHTML = out.join('');
+}
+
+async function ensureSource() {
+    const box = document.getElementById('sourceContent');
+    const url = srcUrl;
+    if (!url || srcLoaded === url) return;
+    box.textContent = 'Loading source...';
+    try {
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        if (url !== srcUrl) return;     // another file was selected meanwhile
+        renderSourceText(text);
+        srcLoaded = url;
+    } catch (e) {
+        box.textContent = 'Could not load the source: ' + e.message;
+    }
+}
+
+async function setViewTab(tab) {
+    if (tab === 'src' && !srcAvail) tab = 'dis';
+    viewTab = tab;
+    document.getElementById('tabDis').classList.toggle('active', tab === 'dis');
+    document.getElementById('tabSrc').classList.toggle('active', tab === 'src');
+    document.getElementById('listingContent').style.display = tab === 'dis' ? '' : 'none';
+    document.getElementById('sourceContent').classList.toggle('visible', tab === 'src');
+    document.querySelector('.page-controls').style.visibility = tab === 'dis' ? '' : 'hidden';
+    if (tab === 'src') await ensureSource();
+}
+
+function scrollSourceTo(line) {
+    document.querySelectorAll('#sourceContent .src-line.hl').forEach(e => e.classList.remove('hl'));
+    const el = document.getElementById('srcl-' + line);
+    if (!el) return false;
+    el.classList.add('hl');
+    el.scrollIntoView({ block: 'center' });
+    return true;
+}
+
+async function showSourceLabel(label) {
+    await setViewTab('src');
+    if (srcLabelLine[label] !== undefined) scrollSourceTo(srcLabelLine[label]);
+}
+
+async function searchSource(query) {
+    await ensureSource();
+    const q = query.trim().toUpperCase();
+    if (!q) return;
+    // An octal address: go to the label that sits at that address
+    if (/^[0-7]+$/.test(q)) {
+        const name = labelsByAddr[parseInt(q, 8)];
+        if (name && srcLabelLine[name] !== undefined) { scrollSourceTo(srcLabelLine[name]); return; }
+    }
+    if (srcLabelLine[q] !== undefined) { scrollSourceTo(srcLabelLine[q]); return; }
+    for (const [name, line] of Object.entries(srcLabelLine)) {
+        if (name.includes(q)) { scrollSourceTo(line); return; }
+    }
+    // Last: the first line of the text that contains the words
+    const rows = document.querySelectorAll('#sourceContent .src-line');
+    for (const row of rows) {
+        if (row.textContent.toUpperCase().includes(q)) { scrollSourceTo(row.id.slice(5)); return; }
     }
 }
 
@@ -2146,6 +2292,13 @@ async function init() {
         renderListing();
     });
 
+    document.getElementById('tabDis').addEventListener('click', () => setViewTab('dis'));
+    document.getElementById('tabSrc').addEventListener('click', () => setViewTab('src'));
+    document.getElementById('sourceContent').addEventListener('click', (e) => {
+        const ref = e.target.closest('.src-ref');
+        if (ref && srcLabelLine[ref.dataset.label] !== undefined) scrollSourceTo(srcLabelLine[ref.dataset.label]);
+    });
+
     document.getElementById('viewPseudo').addEventListener('click', () => {
         viewMode = 'pseudo';
         document.getElementById('viewPseudo').classList.add('active');
@@ -2223,12 +2376,16 @@ async function loadFile(path) {
     // Link to the labelled .uc source when the manifest has one for this file
     const srcInfo = manifest.files.find(f => f.path === path);
     const srcLink = document.getElementById('srcLink');
-    if (srcInfo && srcInfo.sourceFile) {
+    srcAvail = !!(srcInfo && srcInfo.sourceFile);
+    srcUrl = srcAvail ? srcInfo.sourceFile : '';
+    if (srcAvail) {
         srcLink.href = srcInfo.sourceFile;
         srcLink.style.display = '';
     } else {
         srcLink.style.display = 'none';
     }
+    document.getElementById('srcToggle').style.display = srcAvail ? '' : 'none';
+    await setViewTab(srcAvail ? viewTab : 'dis');
 
     try {
         await loadMicrocodeData(path);
