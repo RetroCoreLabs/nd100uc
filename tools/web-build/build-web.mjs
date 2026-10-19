@@ -99,6 +99,8 @@ console.log("Copying pre-assembled .CODE files (patched K source)...");
   if (existsSync(raskCode)) copyFileSync(raskCode, resolve(MC, "ND-110-RASK.CODE"));
   if (existsSync(raskSyms)) copyFileSync(raskSyms, resolve(MC, "ND-110-RASK.SYMBOLS.TXT"));
   if (existsSync(raskSrc))  copyFileSync(raskSrc,  resolve(MC, "ND-110-RASK.uc"));
+  const raskLst = resolve(REPO, "microcode", "ND-110-RASK.LISTING.TXT");
+  if (existsSync(raskLst))  copyFileSync(raskLst,  resolve(MC, "ND-110-RASK.LISTING.TXT"));
   entry({
     id:          "nd110-rask-K-patched",
     name:        "ND-110 RASK - K version (patched source, with labels)",
@@ -108,6 +110,7 @@ console.log("Copying pre-assembled .CODE files (patched K source)...");
     codeFile:    "MC/ND-110-RASK.CODE",
     symbolsFile: "MC/ND-110-RASK.SYMBOLS.TXT",
     sourceFile:  "MC/ND-110-RASK.uc",
+    listingFile: "MC/ND-110-RASK.LISTING.TXT",
     notes:       "C# assembler output from the user-maintained RASK.uc. Version K (0o13 at addr 0o20). 4865 instructions. Does NOT match the L-version factory ROMs we have; source needs upgrade to L before it can replace a factory ROM image.",
   });
 
@@ -290,6 +293,8 @@ console.log("\nAdding the labelled ND-100 sources...");
     copyToMC(s.uc, s.uc);
     copyToMC(s.sym, e.codeFile.replace(/^MC\//, "").replace(/\.CODE$/, ".SYMBOLS.TXT"));
     e.sourceFile = `MC/${s.uc}`;
+    const lst = s.uc.replace(/\.uc$/, ".LISTING.TXT");
+    if (existsSync(resolve(SRC, lst))) { copyToMC(lst, lst); e.listingFile = `MC/${lst}`; }
     e.symbolsFile = e.codeFile.replace(/\.CODE$/, ".SYMBOLS.TXT");
     e.notes += " Labels and source: the labelled .uc (assembles to this image bit for bit).";
   }
@@ -302,6 +307,7 @@ console.log("\nAdding the labelled ND-100 sources...");
     copyToMC("ND-100-3033S-32BIT-FLOAT.CODE", "ND-100-3033S-32BIT-FLOAT-microcode.CODE");
     copyToMC("ND-100-3033S-32BIT-FLOAT.SYMBOLS.TXT", "ND-100-3033S-32BIT-FLOAT-microcode.SYMBOLS.TXT");
     copyToMC("ND-100-3033S-32BIT-FLOAT.uc", "ND-100-3033S-32BIT-FLOAT.uc");
+    copyToMC("ND-100-3033S-32BIT-FLOAT.LISTING.TXT", "ND-100-3033S-32BIT-FLOAT.LISTING.TXT");
     if (existsSync(resolve(MC, "ND-100-3033S-decode.CODE"))) {
       copyFileSync(resolve(MC, "ND-100-3033S-decode.CODE"), resolve(MC, "ND-100-3033S-32BIT-FLOAT-decode.CODE"));
     }
@@ -313,6 +319,7 @@ console.log("\nAdding the labelled ND-100 sources...");
       codeFile:    "MC/ND-100-3033S-32BIT-FLOAT-microcode.CODE",
       symbolsFile: "MC/ND-100-3033S-32BIT-FLOAT-microcode.SYMBOLS.TXT",
       sourceFile:  "MC/ND-100-3033S-32BIT-FLOAT.uc",
+      listingFile: "MC/ND-100-3033S-32BIT-FLOAT.LISTING.TXT",
       notes:       "3033S program with the words 0o517-0o1105 replaced by the printed 32-bit floating point listing (PROM set 026XX). Assembled from the labelled source; no chip dump exists for these PROMs, so these words are not proved against chips. Stored in PROM form (bits 22-27 inverted).",
     });
   }
@@ -329,6 +336,10 @@ console.log("\nAdding the labelled ND-100 sources...");
     copyFileSync(resolve(SRC120, "ND-120-DELILAH-L.uc"), resolve(MC, "ND-120-DELILAH-L.uc"));
     copyFileSync(resolve(SRC120, "ND-120-DELILAH-L.SYMBOLS.TXT"), resolve(MC, "ND-120-3202D-4MB.SYMBOLS.TXT"));
     e.sourceFile = "MC/ND-120-DELILAH-L.uc";
+    if (existsSync(resolve(SRC120, "ND-120-DELILAH-L.LISTING.TXT"))) {
+      copyFileSync(resolve(SRC120, "ND-120-DELILAH-L.LISTING.TXT"), resolve(MC, "ND-120-DELILAH-L.LISTING.TXT"));
+      e.listingFile = "MC/ND-120-DELILAH-L.LISTING.TXT";
+    }
     e.symbolsFile = "MC/ND-120-3202D-4MB.SYMBOLS.TXT";
     e.notes += " Source and labels: DELILAH-L .uc, which assembles to 4886 of this ROM's words exactly (the ROM has 3306 more non-zero words that are not in the source).";
   }
@@ -366,6 +377,7 @@ for (const e of manifestEntries) {
          : "ND-100",
     hasLabels: !!e.symbolsFile,
     sourceFile: e.sourceFile,
+    listingFile: e.listingFile,
     isND110: e.storageForm === "token",
   });
 }

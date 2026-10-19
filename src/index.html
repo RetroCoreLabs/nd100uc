@@ -500,9 +500,14 @@
             background: var(--bg-card);
         }
         .source-content.visible { display: block; }
-        .src-line { display: flex; white-space: pre; padding-right: 20px; }
+        .source-content { border-top: 2px solid var(--border); }
+        .src-line { display: flex; white-space: pre; padding-right: 20px; border-left: 3px solid transparent; }
+        .src-line[data-addr] { cursor: pointer; }
+        .src-line[data-addr]:hover { background: var(--hover-bg); }
         .src-line.hl { background: var(--active-bg); }
-        .src-ln { flex: 0 0 60px; text-align: right; padding-right: 12px; color: var(--text-muted); user-select: none; }
+        .src-line.sel { background: var(--active-bg); border-left-color: var(--active-border); }
+        .src-ln { flex: 0 0 56px; text-align: right; padding-right: 10px; color: var(--text-muted); user-select: none; }
+        .src-addr { flex: 0 0 62px; color: var(--accent); user-select: none; }
         .src-cmt { color: var(--text-secondary); font-style: italic; }
         .src-label { font-weight: 700; color: var(--primary-dark); }
         .src-ref { cursor: pointer; text-decoration: underline dotted; }
@@ -583,7 +588,8 @@
                 </div>
                 <div class="view-toggle" id="srcToggle" style="display:none">
                     <button id="tabDis" class="active" title="Decoded micro words">Disassembly</button>
-                    <button id="tabSrc" title="Full commented micro code source (.uc)">Source</button>
+                    <button id="tabSrc" title="Full commented micro code source, with the micro address of every instruction">Source</button>
+                    <button id="tabBoth" title="Disassembly and source together, kept in step">Both</button>
                 </div>
                 <label style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:4px">
                     <input type="checkbox" id="hideEmpty"> Hide empty
@@ -1597,6 +1603,7 @@ function renderListing() {
 
 function selectInstruction(addr) {
     selectedAddr = addr;
+    syncSourceTo(addr);
 
     // Update active row
     document.querySelectorAll('.listing-row').forEach(r => r.classList.remove('active'));
@@ -1799,34 +1806,76 @@ function searchLabel(query) {
 }
 
 /* =========================================================================
-   SOURCE TAB: the full commented .uc text of the selected file
+   SOURCE TAB: the full commented micro code source, from the assembler listing.
+   Every listing line carries the micro address it was assembled at, so a source
+   line selects the instruction in the disassembly and the detail panel (bit
+   decoding) and the other way round.
    ========================================================================= */
-let viewTab = 'dis';      // 'dis' = decoded words, 'src' = source text
-let srcAvail = false;     // the selected file has a .uc source in the manifest
-let srcUrl = '';          // address of that source
+let viewTab = 'dis';      // 'dis' = decoded words, 'src' = source, 'both' = both
+let srcAvail = false;     // the selected file has a source in the manifest
+let srcUrl = '';          // listing (or .uc) of the selected file
 let srcLoaded = '';       // address of the text now shown in #sourceContent
 let srcLabelLine = {};    // label -> line number (1 based) of its definition
+let srcLabelAddr = {};    // label -> micro address of its definition (listing only)
+let srcAddrLines = {};    // micro address -> { code: [line numbers of its code lines] }
 
-function renderSourceText(text) {
-    const lines = text.replace(/\r\n?/g, '\n').split('\n');
-    const defRe = /^\s*([A-Z0-9_]+):/;
-
-    // First pass: where every label is defined
-    srcLabelLine = {};
-    lines.forEach((ln, i) => {
-        const p = ln.indexOf('%');
-        const m = defRe.exec(p < 0 ? ln : ln.slice(0, p));
-        if (m && srcLabelLine[m[1]] === undefined) srcLabelLine[m[1]] = i + 1;
+// Listing lines are "NNNN  AAAAAA  <source line>": line number, octal address.
+function parseSourceText(text, isListing) {
+    const raw = text.replace(/\r\n?/g, '\n').split('\n');
+    if (raw.length && raw[raw.length - 1] === '') raw.pop();
+    const re = /^(\d+) {2}([0-7]{6})(.*)$/;
+    return raw.map((ln, i) => {
+        if (isListing) {
+            const m = re.exec(ln);
+            if (m) {
+                const rest = m[3].startsWith('  ') ? m[3].slice(2) : m[3].trimStart();
+                return { n: parseInt(m[1], 10), addr: parseInt(m[2], 8), text: rest };
+            }
+        }
+        return { n: i + 1, addr: null, text: ln };
     });
+}
 
-    // Second pass: one row per line; label definitions in bold, jump operands
-    // that name a label are links to its definition, comments in italics.
+function renderSourceText(text, isListing) {
+    const rows = parseSourceText(text, isListing);
+    const defRe = /^\s*([A-Z0-9_]+):/;
+    const codeOf = (t) => { const p = t.indexOf('%'); return p < 0 ? t : t.slice(0, p); };
+
+    // First pass: labels, and the code lines of every address
+    srcLabelLine = {};
+    srcLabelAddr = {};
+    srcAddrLines = {};
+    let lastCodeAddr = null;   // address of the previous code line
+    let skipGroup = false;     // the current run repeats an address seen before
+    for (const r of rows) {
+        const code = codeOf(r.text);
+        const isCode = code.trim() !== '';
+        if (r.addr !== null && isCode) {
+            if (r.addr !== lastCodeAddr) skipGroup = srcAddrLines[r.addr] !== undefined;
+            if (!skipGroup) {
+                const g = srcAddrLines[r.addr] || (srcAddrLines[r.addr] = { code: [] });
+                g.code.push(r.n);
+            }
+            lastCodeAddr = r.addr;
+        }
+        const m = defRe.exec(code);
+        if (m && srcLabelLine[m[1]] === undefined) {
+            srcLabelLine[m[1]] = r.n;
+            if (r.addr !== null) srcLabelAddr[m[1]] = r.addr;
+        }
+    }
+
+    // Second pass: one row per line. The address is shown on the first code
+    // line of an instruction; label definitions are bold, jump operands that
+    // name a label are links, comments are in italics.
     const tokRe = /[A-Z0-9_]+/g;
     const out = [];
-    lines.forEach((ln, i) => {
-        const p = ln.indexOf('%');
-        const code = p < 0 ? ln : ln.slice(0, p);
-        const cmt = p < 0 ? '' : ln.slice(p);
+    let lastAddrShown = -1;
+    for (const r of rows) {
+        const p = r.text.indexOf('%');
+        const code = p < 0 ? r.text : r.text.slice(0, p);
+        const cmt = p < 0 ? '' : r.text.slice(p);
+        const isCode = code.trim() !== '';
         const dm = defRe.exec(code);
         const defStart = dm ? code.indexOf(dm[1]) : -1;
         let html = '';
@@ -1850,8 +1899,19 @@ function renderSourceText(text) {
         }
         html += escHtml(code.slice(pos));
         if (cmt) html += `<span class="src-cmt">${escHtml(cmt)}</span>`;
-        out.push(`<div class="src-line" id="srcl-${i + 1}"><span class="src-ln">${i + 1}</span><span>${html}</span></div>`);
-    });
+
+        let addrCol = '';
+        let attr = '';
+        if (r.addr !== null && isCode) {
+            attr = ` data-addr="${r.addr}"`;
+            if (r.addr !== lastAddrShown) {
+                addrCol = r.addr.toString(8).padStart(6, '0');
+                lastAddrShown = r.addr;
+            }
+        }
+        out.push(`<div class="src-line" id="srcl-${r.n}"${attr}><span class="src-ln">${r.n}</span>` +
+                 `<span class="src-addr">${addrCol}</span><span>${html}</span></div>`);
+    }
     document.getElementById('sourceContent').innerHTML = out.join('');
 }
 
@@ -1865,22 +1925,45 @@ async function ensureSource() {
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const text = await resp.text();
         if (url !== srcUrl) return;     // another file was selected meanwhile
-        renderSourceText(text);
+        renderSourceText(text, /\.LISTING\.TXT$/i.test(url));
         srcLoaded = url;
+        if (typeof selectedAddr === 'number') syncSourceTo(selectedAddr);
     } catch (e) {
         box.textContent = 'Could not load the source: ' + e.message;
     }
 }
 
 async function setViewTab(tab) {
-    if (tab === 'src' && !srcAvail) tab = 'dis';
+    if ((tab === 'src' || tab === 'both') && !srcAvail) tab = 'dis';
     viewTab = tab;
     document.getElementById('tabDis').classList.toggle('active', tab === 'dis');
     document.getElementById('tabSrc').classList.toggle('active', tab === 'src');
-    document.getElementById('listingContent').style.display = tab === 'dis' ? '' : 'none';
-    document.getElementById('sourceContent').classList.toggle('visible', tab === 'src');
-    document.querySelector('.page-controls').style.visibility = tab === 'dis' ? '' : 'hidden';
-    if (tab === 'src') await ensureSource();
+    document.getElementById('tabBoth').classList.toggle('active', tab === 'both');
+    document.getElementById('listingContent').style.display = tab === 'src' ? 'none' : '';
+    document.getElementById('sourceContent').classList.toggle('visible', tab !== 'dis');
+    document.querySelector('.page-controls').style.visibility = tab === 'src' ? 'hidden' : '';
+    if (tab !== 'dis') await ensureSource();
+}
+
+// Bring a source line into view: only scroll when it is outside the box.
+function revealSource(el, centre) {
+    const box = document.getElementById('sourceContent');
+    const b = box.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (centre || r.top < b.top || r.bottom > b.bottom) el.scrollIntoView({ block: 'center' });
+}
+
+// The instruction at this micro address was selected: mark its source lines.
+function syncSourceTo(addr) {
+    if (!srcLoaded || srcLoaded !== srcUrl) return;
+    document.querySelectorAll('#sourceContent .src-line.sel').forEach(e => e.classList.remove('sel'));
+    const g = srcAddrLines[addr];
+    if (!g) return;
+    g.code.forEach(n => { const el = document.getElementById('srcl-' + n); if (el) el.classList.add('sel'); });
+    if (viewTab !== 'dis') {
+        const first = document.getElementById('srcl-' + g.code[0]);
+        if (first) revealSource(first, false);
+    }
 }
 
 function scrollSourceTo(line) {
@@ -1888,27 +1971,41 @@ function scrollSourceTo(line) {
     const el = document.getElementById('srcl-' + line);
     if (!el) return false;
     el.classList.add('hl');
-    el.scrollIntoView({ block: 'center' });
+    revealSource(el, true);
     return true;
 }
 
+// Jump to the definition of a label: select its instruction (disassembly and
+// detail panel follow) and show the definition line.
+function gotoSourceLabel(label) {
+    const line = srcLabelLine[label];
+    if (line === undefined) return;
+    const addr = srcLabelAddr[label];
+    if (addr !== undefined) jumpToAddr(addr);
+    scrollSourceTo(line);
+}
+
+// A click on a label heading in the disassembly.
 async function showSourceLabel(label) {
-    await setViewTab('src');
-    if (srcLabelLine[label] !== undefined) scrollSourceTo(srcLabelLine[label]);
+    await setViewTab(viewTab === 'dis' ? 'both' : viewTab);
+    gotoSourceLabel(label);
 }
 
 async function searchSource(query) {
     await ensureSource();
     const q = query.trim().toUpperCase();
     if (!q) return;
-    // An octal address: go to the label that sits at that address
+    // An octal address: select that instruction
     if (/^[0-7]+$/.test(q)) {
-        const name = labelsByAddr[parseInt(q, 8)];
-        if (name && srcLabelLine[name] !== undefined) { scrollSourceTo(srcLabelLine[name]); return; }
+        const addr = parseInt(q, 8);
+        const g = srcAddrLines[addr];
+        if (g) { jumpToAddr(addr); scrollSourceTo(g.code[0]); return; }
+        const name = labelsByAddr[addr];
+        if (name && srcLabelLine[name] !== undefined) { gotoSourceLabel(name); return; }
     }
-    if (srcLabelLine[q] !== undefined) { scrollSourceTo(srcLabelLine[q]); return; }
-    for (const [name, line] of Object.entries(srcLabelLine)) {
-        if (name.includes(q)) { scrollSourceTo(line); return; }
+    if (srcLabelLine[q] !== undefined) { gotoSourceLabel(q); return; }
+    for (const name of Object.keys(srcLabelLine)) {
+        if (name.includes(q)) { gotoSourceLabel(name); return; }
     }
     // Last: the first line of the text that contains the words
     const rows = document.querySelectorAll('#sourceContent .src-line');
@@ -2296,8 +2393,11 @@ async function init() {
     document.getElementById('tabSrc').addEventListener('click', () => setViewTab('src'));
     document.getElementById('sourceContent').addEventListener('click', (e) => {
         const ref = e.target.closest('.src-ref');
-        if (ref && srcLabelLine[ref.dataset.label] !== undefined) scrollSourceTo(srcLabelLine[ref.dataset.label]);
+        if (ref) { gotoSourceLabel(ref.dataset.label); return; }
+        const row = e.target.closest('.src-line[data-addr]');
+        if (row) jumpToAddr(parseInt(row.dataset.addr, 10));
     });
+    document.getElementById('tabBoth').addEventListener('click', () => setViewTab('both'));
 
     document.getElementById('viewPseudo').addEventListener('click', () => {
         viewMode = 'pseudo';
@@ -2377,7 +2477,7 @@ async function loadFile(path) {
     const srcInfo = manifest.files.find(f => f.path === path);
     const srcLink = document.getElementById('srcLink');
     srcAvail = !!(srcInfo && srcInfo.sourceFile);
-    srcUrl = srcAvail ? srcInfo.sourceFile : '';
+    srcUrl = srcAvail ? (srcInfo.listingFile || srcInfo.sourceFile) : '';
     if (srcAvail) {
         srcLink.href = srcInfo.sourceFile;
         srcLink.style.display = '';
