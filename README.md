@@ -7,7 +7,7 @@ ROM combiners, and build pipeline.
 The TypeScript library and YAML definitions live in the shared
 [nd-microcode-meta](https://github.com/RetroCoreLabs/nd-microcode-meta)
 submodule. The VSCode extension lives in a
-[separate repo](https://github.com/RetroCoreLabs/nd-microcode).
+[separate repo](https://github.com/RetroCoreLabs/vscode-nd-microcode).
 
 **Live web viewer:** [retrocorelabs.github.io/nd100uc](https://retrocorelabs.github.io/nd100uc/)
 
@@ -23,7 +23,7 @@ submodule. The VSCode extension lives in a
 | ND-110/120 ROM combiner + CLI   | done        | 2-chip EPROM interleave with auto-detect (TypeScript)            |
 | Web disassembler                 | done        | 3-line layout, opcode badges, clickable labels, all models       |
 | GitHub Pages auto-deploy         | done        | Pushes to main auto-deploy the web viewer                       |
-| VSCode extension                 | done        | [nd-microcode](https://github.com/RetroCoreLabs/nd-microcode) |
+| VSCode extension                 | done        | [vscode-nd-microcode](https://github.com/RetroCoreLabs/vscode-nd-microcode) |
 
 ## Repository layout
 
@@ -120,7 +120,7 @@ The web app is also auto-deployed to GitHub Pages on every push to main.
 | Repo | Description |
 |------|-------------|
 | [nd-microcode-meta](https://github.com/RetroCoreLabs/nd-microcode-meta) | Shared submodule: YAML definitions, TS library, reference ROMs |
-| [nd-microcode](https://github.com/RetroCoreLabs/nd-microcode) | VSCode extension for .uc files |
+| [vscode-nd-microcode](https://github.com/RetroCoreLabs/vscode-nd-microcode) | VSCode extension for .uc files |
 
 ## License
 
