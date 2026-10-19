@@ -517,6 +517,7 @@
         </div>
         <div class="header-controls">
             <select id="fileSelect" title="Select microcode file"></select>
+            <a class="settings-btn" id="srcLink" href="#" target="_blank" rel="noopener" style="display:none;text-decoration:none" title="Labelled micro code source (.uc) of the selected file">Source</a>
             <button class="settings-btn" id="refBtn" title="Field Reference">Ref</button>
             <div class="export-menu">
                 <button class="settings-btn" id="exportBtn">Export</button>
@@ -2198,6 +2199,16 @@ function navigateRow(delta) {
 async function loadFile(path) {
     currentFile = path;
     document.getElementById('statusText').textContent = 'Loading...';
+
+    // Link to the labelled .uc source when the manifest has one for this file
+    const srcInfo = manifest.files.find(f => f.path === path);
+    const srcLink = document.getElementById('srcLink');
+    if (srcInfo && srcInfo.sourceFile) {
+        srcLink.href = srcInfo.sourceFile;
+        srcLink.style.display = '';
+    } else {
+        srcLink.style.display = 'none';
+    }
 
     try {
         await loadMicrocodeData(path);

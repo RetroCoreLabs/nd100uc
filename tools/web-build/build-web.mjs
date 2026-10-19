@@ -266,6 +266,59 @@ for (const e of manifestEntries) {
 }
 
 // --------------------------------------------------------------------
+// 3c. Labelled ND-100 sources (microcode/ND-100/, written back from the
+//     printed Norsk Data listing, see microcode/ND-100/README.md). Their
+//     assembled .CODE is bit-identical to the 3033S and 3033E-CX chip images,
+//     so the real label names of the source replace the decode-PLA labels
+//     (L<address>) for those entries. The 32-bit floating point variant has
+//     no chip image: its own assembled .CODE is added as a separate entry.
+// --------------------------------------------------------------------
+
+console.log("\nAdding the labelled ND-100 sources...");
+{
+  const SRC = resolve(REPO, "microcode", "ND-100");
+  const copyToMC = (from, to) => copyFileSync(resolve(SRC, from), resolve(MC, to));
+
+  const sourceOf = {
+    "nd100-3033S-microcode":        { uc: "ND-100-3033S.uc",        sym: "ND-100-3033S.SYMBOLS.TXT" },
+    "nd100-3033E-CX-microcode":     { uc: "ND-100-3033E-CX.uc",     sym: "ND-100-3033E-CX.SYMBOLS.TXT" },
+    "nd100-3033E-CX-microcode_ext": { uc: "ND-100-3033E-CX.uc",     sym: "ND-100-3033E-CX.SYMBOLS.TXT" },
+  };
+  for (const e of manifestEntries) {
+    const s = sourceOf[e.id];
+    if (!s || !existsSync(resolve(SRC, s.uc))) continue;
+    copyToMC(s.uc, s.uc);
+    copyToMC(s.sym, e.codeFile.replace(/^MC\//, "").replace(/\.CODE$/, ".SYMBOLS.TXT"));
+    e.sourceFile = `MC/${s.uc}`;
+    e.symbolsFile = e.codeFile.replace(/\.CODE$/, ".SYMBOLS.TXT");
+    e.notes += " Labels and source: the labelled .uc (assembles to this image bit for bit).";
+  }
+
+  // 32-bit floating point (PROM set 026XX). The page finds the decode PLA by
+  // the file name (-microcode -> -decode); the 3033S decode PROMs are on the
+  // same card and the entry points of the 32-bit routines are at the same
+  // addresses as the 48-bit ones (checked in the README of microcode/ND-100).
+  if (existsSync(resolve(SRC, "ND-100-3033S-32BIT-FLOAT.CODE"))) {
+    copyToMC("ND-100-3033S-32BIT-FLOAT.CODE", "ND-100-3033S-32BIT-FLOAT-microcode.CODE");
+    copyToMC("ND-100-3033S-32BIT-FLOAT.SYMBOLS.TXT", "ND-100-3033S-32BIT-FLOAT-microcode.SYMBOLS.TXT");
+    copyToMC("ND-100-3033S-32BIT-FLOAT.uc", "ND-100-3033S-32BIT-FLOAT.uc");
+    if (existsSync(resolve(MC, "ND-100-3033S-decode.CODE"))) {
+      copyFileSync(resolve(MC, "ND-100-3033S-decode.CODE"), resolve(MC, "ND-100-3033S-32BIT-FLOAT-decode.CODE"));
+    }
+    entry({
+      id:          "nd100-3033S-32bit-float-microcode",
+      name:        "ND-100 3033S 32-bit floating point (source, no chip image)",
+      model:       "nd100",
+      storageForm: "prom",
+      codeFile:    "MC/ND-100-3033S-32BIT-FLOAT-microcode.CODE",
+      symbolsFile: "MC/ND-100-3033S-32BIT-FLOAT-microcode.SYMBOLS.TXT",
+      sourceFile:  "MC/ND-100-3033S-32BIT-FLOAT.uc",
+      notes:       "3033S program with the words 0o517-0o1105 replaced by the printed 32-bit floating point listing (PROM set 026XX). Assembled from the labelled source; no chip dump exists for these PROMs, so these words are not proved against chips. Stored in PROM form (bits 22-27 inverted).",
+    });
+  }
+}
+
+// --------------------------------------------------------------------
 // 4. Write manifest
 // --------------------------------------------------------------------
 
@@ -296,6 +349,7 @@ for (const e of manifestEntries) {
          : e.model === "nd120" ? "ND-120"
          : "ND-100",
     hasLabels: !!e.symbolsFile,
+    sourceFile: e.sourceFile,
     isND110: e.storageForm === "token",
   });
 }
