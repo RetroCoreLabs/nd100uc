@@ -29,6 +29,7 @@
         .dark-theme {
             --primary: #3498db;
             --primary-dark: #5dade2;
+            --link: #5dade2;
             --secondary: #0a0a15;
             --accent: #e74c3c;
             --bg-body: #1a1a2e;
@@ -69,6 +70,17 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             flex-shrink: 0;
         }
+
+        .scope-note {
+            flex-shrink: 0;
+            padding: 6px 20px;
+            font-size: 12px;
+            line-height: 1.4;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border);
+        }
+        .scope-note a { color: var(--link, #1b6ca8); text-decoration: underline; }
 
         .header-logo { height: 32px; width: auto; mix-blend-mode: multiply; }
 
@@ -529,6 +541,14 @@
             <button class="toggle-panel-btn" id="togglePanel" title="Toggle detail panel">&#9776;</button>
             <button class="settings-btn" id="themeBtn" title="Toggle theme">&#9790;</button>
         </div>
+    </div>
+    <div class="scope-note">
+        This page decodes the micro code of the <b>ND-100</b>, <b>ND-110</b> and <b>ND-120</b> (64-bit micro words).
+        NORD-10, ND-500 and ND-5000 are not on this page:
+        the <a href="https://retrocorelabs.github.io/nd5000uc/" target="_blank" rel="noopener">ND-5000 page</a> shows the ND-5000,
+        and <a href="https://retrocorelabs.github.io/NDMicroAsm/" target="_blank" rel="noopener">NDMicroAsm</a> and the
+        <a href="https://github.com/RetroCoreLabs/nd-microcode" target="_blank" rel="noopener">VS Code extension</a>
+        assemble and disassemble NORD-10, ND-100, ND-110, ND-120, ND-500 and ND-5000.
     </div>
     <div class="main-area">
         <div class="listing-pane">
